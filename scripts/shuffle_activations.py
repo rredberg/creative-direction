@@ -260,7 +260,7 @@ def plot_auc_results(token_results, layer_results, shuffled_token_results=None, 
     layer_aucs = [layer_results[l]['auc'] for l in layers]
     
     # Main results
-    ax2.plot(layers, layer_aucs, 'o-', linewidth=2, markersize=6, color='#E74C3C', label='Real Labels')
+    ax2.plot(layers, layer_aucs, 'o-', linewidth=2, markersize=6, color='#2E86C1', label='Real Labels')
     
     # Add shuffled baseline if provided
     if shuffled_layer_results is not None:
