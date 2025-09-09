@@ -6,16 +6,15 @@ from utils.analysis_utils import load_activations, MAX_TOKEN, N_LAYERS, project_
 from sklearn.metrics import accuracy_score, roc_auc_score
 
 
-def get_best_auc_per_token(split_name, neutral_folder, creative_folder, mdvs):
+def get_best_auc_per_token(split_name, formal_folder, creative_folder, mdvs, thresholds):
     """Get the best AUC for each token position across all layers"""
     print(f"\nFinding best AUC per token on {split_name} set...")
-    a_neutral = load_activations(neutral_folder)
+    a_formal = load_activations(formal_folder)
     a_creative = load_activations(creative_folder)
     
     
     token_results = {}  # token -> {'auc': best_auc, 'layer': best_layer, 'acc': best_acc}
     
-    # for token in range(-MAX_TOKEN, 0):
     for token in range(1, MAX_TOKEN + 1):
         best_auc_for_token = -float('inf')
         best_layer_for_token = None
@@ -23,21 +22,20 @@ def get_best_auc_per_token(split_name, neutral_folder, creative_folder, mdvs):
         
         for layer in range(N_LAYERS):
             mdv = mdvs[(layer, token)]
+            threshold = thresholds[(layer, token)]
             # Get activations
-            test_neutral = torch.stack(a_neutral[layer][token])
+            test_formal = torch.stack(a_formal[layer][token])
             test_creative = torch.stack(a_creative[layer][token])
             # Project onto MDV
-            proj_neutral = project_onto(test_neutral, mdv)
+            proj_formal = project_onto(test_formal, mdv)
             proj_creative = project_onto(test_creative, mdv)
             # Combine and label
-            X = torch.cat([proj_neutral, proj_creative]).numpy()
+            X = torch.cat([proj_formal, proj_creative]).numpy()
             y = torch.cat([
-                torch.zeros(len(proj_neutral)),
+                torch.zeros(len(proj_formal)),
                 torch.ones(len(proj_creative))
             ]).numpy()
                 
-            # Threshold = midpoint between means
-            threshold = (proj_creative.mean() + proj_neutral.mean()) / 2
             y_pred = (X > threshold.item()).astype(int)
             acc = accuracy_score(y, y_pred)
             auc = roc_auc_score(y, X)
@@ -56,10 +54,10 @@ def get_best_auc_per_token(split_name, neutral_folder, creative_folder, mdvs):
     
     return token_results
 
-def get_best_auc_per_layer(split_name, neutral_folder, creative_folder, mdvs):
+def get_best_auc_per_layer(split_name, formal_folder, creative_folder, mdvs, thresholds):
     """Get the best AUC for each layer across all token positions"""
     print(f"\nFinding best AUC per layer on {split_name} set...")
-    a_neutral = load_activations(neutral_folder)
+    a_formal = load_activations(formal_folder)
     a_creative = load_activations(creative_folder)
     
     layer_results = {}  # layer -> {'auc': best_auc, 'token': best_token, 'acc': best_acc}
@@ -72,20 +70,19 @@ def get_best_auc_per_layer(split_name, neutral_folder, creative_folder, mdvs):
         # for token in range(-MAX_TOKEN, 0):
         for token in range(1, MAX_TOKEN + 1):
             mdv = mdvs[(layer, token)]
+            threshold = thresholds[(layer, token)]
             # Get activations
-            test_neutral = torch.stack(a_neutral[layer][token])
+            test_formal = torch.stack(a_formal[layer][token])
             test_creative = torch.stack(a_creative[layer][token])
             # Project onto MDV
-            proj_neutral = project_onto(test_neutral, mdv)
+            proj_formal = project_onto(test_formal, mdv)
             proj_creative = project_onto(test_creative, mdv)
             # Combine and label
-            X = torch.cat([proj_neutral, proj_creative]).numpy()
+            X = torch.cat([proj_formal, proj_creative]).numpy()
             y = torch.cat([
-                torch.zeros(len(proj_neutral)),
+                torch.zeros(len(proj_formal)),
                 torch.ones(len(proj_creative))
             ]).numpy()
-            # Threshold = midpoint between means
-            threshold = (proj_creative.mean() + proj_neutral.mean()) / 2
             y_pred = (X > threshold.item()).astype(int)
             acc = accuracy_score(y, y_pred)
             auc = roc_auc_score(y, X)
@@ -104,7 +101,7 @@ def get_best_auc_per_layer(split_name, neutral_folder, creative_folder, mdvs):
     
     return layer_results
 
-def create_shuffled_folders_symlinks(neutral_folder, creative_folder, output_base_dir, random_seed=42):
+def create_shuffled_folders_symlinks(formal_folder, creative_folder, output_base_dir, random_seed=42):
     """
     Create shuffled folders using symbolic links instead of copying files.
     Uses zero additional disk space.
@@ -112,29 +109,29 @@ def create_shuffled_folders_symlinks(neutral_folder, creative_folder, output_bas
     print(f"Creating shuffled folders with symlinks in {output_base_dir}...")
     
     # Create output directories
-    shuffled_neutral_dir = os.path.join(output_base_dir, "shuffled_neutral")
+    shuffled_formal_dir = os.path.join(output_base_dir, "shuffled_formal")
     shuffled_creative_dir = os.path.join(output_base_dir, "shuffled_creative")
     
     # Remove existing directories if they exist
     import shutil
-    if os.path.exists(shuffled_neutral_dir):
-        shutil.rmtree(shuffled_neutral_dir)
+    if os.path.exists(shuffled_formal_dir):
+        shutil.rmtree(shuffled_formal_dir)
     if os.path.exists(shuffled_creative_dir):
         shutil.rmtree(shuffled_creative_dir)
     
-    os.makedirs(shuffled_neutral_dir, exist_ok=True)
+    os.makedirs(shuffled_formal_dir, exist_ok=True)
     os.makedirs(shuffled_creative_dir, exist_ok=True)
     
     # Get all .pt files from both folders
-    neutral_files = [f for f in os.listdir(neutral_folder) if f.endswith('.pt')]
+    formal_files = [f for f in os.listdir(formal_folder) if f.endswith('.pt')]
     creative_files = [f for f in os.listdir(creative_folder) if f.endswith('.pt')]
     
-    print(f"Found {len(neutral_files)} neutral files and {len(creative_files)} creative files")
+    print(f"Found {len(formal_files)} formal files and {len(creative_files)} creative files")
     
     # Create list of (file_path, original_label) tuples
     all_files = []
-    for f in neutral_files:
-        all_files.append((os.path.join(os.path.abspath(neutral_folder), f), 'neutral'))
+    for f in formal_files:
+        all_files.append((os.path.join(os.path.abspath(formal_folder), f), 'formal'))
     for f in creative_files:
         all_files.append((os.path.join(os.path.abspath(creative_folder), f), 'creative'))
     
@@ -144,16 +141,16 @@ def create_shuffled_folders_symlinks(neutral_folder, creative_folder, output_bas
     
     # Split into two balanced groups
     mid = len(all_files) // 2
-    new_neutral_files = all_files[:mid]
+    new_formal_files = all_files[:mid]
     new_creative_files = all_files[mid:]
     
-    print(f"Creating {len(new_neutral_files)} symlinks in shuffled_neutral")
+    print(f"Creating {len(new_formal_files)} symlinks in shuffled_formal")
     print(f"Creating {len(new_creative_files)} symlinks in shuffled_creative")
     
-    # Create symbolic links for neutral folder
-    print("Creating symlinks for shuffled_neutral...")
-    for i, (original_path, original_label) in tqdm(enumerate(new_neutral_files), total=len(new_neutral_files)):
-        new_path = os.path.join(shuffled_neutral_dir, f"prompt_{i}.pt")
+    # Create symbolic links for formal folder
+    print("Creating symlinks for shuffled_formal...")
+    for i, (original_path, original_label) in tqdm(enumerate(new_formal_files), total=len(new_formal_files)):
+        new_path = os.path.join(shuffled_formal_dir, f"prompt_{i}.pt")
         try:
             os.symlink(original_path, new_path)
         except OSError as e:
@@ -169,22 +166,22 @@ def create_shuffled_folders_symlinks(neutral_folder, creative_folder, output_bas
             print(f"Error creating symlink {new_path}: {e}")
     
     print(f"Shuffled symlink folders created successfully!")
-    print(f"  - {shuffled_neutral_dir}: {len(new_neutral_files)} symlinks")
+    print(f"  - {shuffled_formal_dir}: {len(new_formal_files)} symlinks")
     print(f"  - {shuffled_creative_dir}: {len(new_creative_files)} symlinks")
     
     # Print shuffle statistics
-    neutral_to_neutral = sum(1 for _, orig_label in new_neutral_files if orig_label == 'neutral')
-    creative_to_neutral = len(new_neutral_files) - neutral_to_neutral
-    neutral_to_creative = sum(1 for _, orig_label in new_creative_files if orig_label == 'neutral') 
-    creative_to_creative = len(new_creative_files) - neutral_to_creative
+    formal_to_formal = sum(1 for _, orig_label in new_formal_files if orig_label == 'formal')
+    creative_to_formal = len(new_formal_files) - formal_to_formal
+    formal_to_creative = sum(1 for _, orig_label in new_creative_files if orig_label == 'formal') 
+    creative_to_creative = len(new_creative_files) - formal_to_creative
     
     print(f"\nShuffle statistics:")
-    print(f"  shuffled_neutral folder: {neutral_to_neutral} orig neutral + {creative_to_neutral} orig creative")
-    print(f"  shuffled_creative folder: {neutral_to_creative} orig neutral + {creative_to_creative} orig creative")
+    print(f"  shuffled_formal folder: {formal_to_formal} orig formal + {creative_to_formal} orig creative")
+    print(f"  shuffled_creative folder: {formal_to_creative} orig formal + {creative_to_creative} orig creative")
     
     # Verify symlinks work
     print(f"\nVerifying symlinks...")
-    sample_file = os.path.join(shuffled_neutral_dir, "prompt_0.pt")
+    sample_file = os.path.join(shuffled_formal_dir, "prompt_0.pt")
     if os.path.exists(sample_file):
         print(f"✓ Sample symlink works: {sample_file} -> {os.readlink(sample_file)}")
     else:
@@ -200,12 +197,12 @@ def create_all_shuffled_splits_symlinks(base_dir="activations", random_seed=42):
         print(f"Processing {split} split")
         print("="*50)
         
-        neutral_folder = os.path.join(base_dir, split, "neutral")
+        formal_folder = os.path.join(base_dir, split, "formal")
         creative_folder = os.path.join(base_dir, split, "creative")
         output_base = os.path.join(base_dir, split)
         
-        if os.path.exists(neutral_folder) and os.path.exists(creative_folder):
-            create_shuffled_folders_symlinks(neutral_folder, creative_folder, output_base, 
+        if os.path.exists(formal_folder) and os.path.exists(creative_folder):
+            create_shuffled_folders_symlinks(formal_folder, creative_folder, output_base, 
                                            random_seed + hash(split) % 1000)
         else:
             print(f"Skipping {split} - folders don't exist")
@@ -255,9 +252,8 @@ def plot_auc_results(token_results, layer_results, shuffled_token_results=None, 
     
     # Add reference line labels
     ax1.text(max(tokens) - 0.5, 0.91, 'AUC = 0.9', fontsize=10, ha='right', va='bottom', color='red')
-    ax1.text(max(tokens) - 0.5, 0.51, 'Random (0.5)', fontsize=10, ha='right', va='bottom', color='black')
     
-    ax1.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02))
+    ax1.legend(loc='center right', bbox_to_anchor=(0.02, 0.02))
     
     # Plot 2: AUC across layers  
     layers = sorted(layer_results.keys())
@@ -292,9 +288,8 @@ def plot_auc_results(token_results, layer_results, shuffled_token_results=None, 
     
     # Add reference line labels
     ax2.text(max(layers) - 1, 0.91, 'AUC = 0.9', fontsize=10, ha='right', va='bottom', color='red')
-    ax2.text(max(layers) - 1, 0.51, 'Random (0.5)', fontsize=10, ha='right', va='bottom', color='black')
     
-    ax2.legend(loc="lower right")
+    ax2.legend(loc="center right")
     
     plt.tight_layout()
     plt.savefig(f"{save_dir}/auc_analysis_with_baseline.png", dpi=300, bbox_inches='tight')
@@ -346,21 +341,22 @@ def plot_auc_results(token_results, layer_results, shuffled_token_results=None, 
 
 def main():
     mdvs = torch.load("representations/mdvs.pt")
+    thresholds = torch.load("representations/thresholds.pt")
 
-    create_shuffled_folders_symlinks("activations/test/neutral", "activations/test/creative", "activations/test")
+    create_shuffled_folders_symlinks("activations/test/formal", "activations/test/creative", "activations/test")
 
     shuffled_results = get_best_auc_per_token("test_shuffled", 
-                                         "activations/test/shuffled_neutral", 
+                                         "activations/test/shuffled_formal", 
                                          "activations/test/shuffled_creative", 
-                                         mdvs)
+                                         mdvs, thresholds)
 
     # Get your regular results
-    token_results = get_best_auc_per_token("test", "activations/test/neutral", "activations/test/creative", mdvs)
-    layer_results = get_best_auc_per_layer("test", "activations/test/neutral", "activations/test/creative", mdvs)
+    token_results = get_best_auc_per_token("test", "activations/test/formal", "activations/test/creative", mdvs, thresholds)
+    layer_results = get_best_auc_per_layer("test", "activations/test/formal", "activations/test/creative", mdvs, thresholds)
     
     # Get shuffled results
-    shuffled_token_results = get_best_auc_per_token("test_shuffled", "activations/test/shuffled_neutral", "activations/test/shuffled_creative", mdvs)
-    shuffled_layer_results = get_best_auc_per_layer("test_shuffled", "activations/test/shuffled_neutral", "activations/test/shuffled_creative", mdvs)
+    shuffled_token_results = get_best_auc_per_token("test_shuffled", "activations/test/shuffled_formal", "activations/test/shuffled_creative", mdvs, thresholds)
+    shuffled_layer_results = get_best_auc_per_layer("test_shuffled", "activations/test/shuffled_formal", "activations/test/shuffled_creative", mdvs, thresholds)
     
     # Plot with baseline
     plot_auc_results(token_results, layer_results, shuffled_token_results, shuffled_layer_results)

@@ -10,10 +10,10 @@ import os
 
 RANDOM_SEED = 32
 
-def get_best_auc_per_token(split_name, neutral_folder, creative_folder, mdvs, thresholds):
+def get_best_auc_per_token(split_name, formal_folder, creative_folder, mdvs, thresholds):
     """Get the best AUC for each token position across all layers"""
     print(f"\nFinding best AUC per token on {split_name} set...")
-    a_neutral = load_activations(neutral_folder)
+    a_formal = load_activations(formal_folder)
     a_creative = load_activations(creative_folder)
     
     token_results = {}  # token -> {'auc': best_auc, 'layer': best_layer, 'acc': best_acc}
@@ -27,15 +27,15 @@ def get_best_auc_per_token(split_name, neutral_folder, creative_folder, mdvs, th
             mdv = mdvs[(layer, token)]
             threshold = thresholds[(layer, token)]
             # Get activations
-            test_neutral = torch.stack(a_neutral[layer][token])
+            test_formal = torch.stack(a_formal[layer][token])
             test_creative = torch.stack(a_creative[layer][token])
             # Project onto MDV
-            proj_neutral = project_onto(test_neutral, mdv)
+            proj_formal = project_onto(test_formal, mdv)
             proj_creative = project_onto(test_creative, mdv)
             # Combine and label
-            X = torch.cat([proj_neutral, proj_creative]).numpy()
+            X = torch.cat([proj_formal, proj_creative]).numpy()
             y = torch.cat([
-                torch.zeros(len(proj_neutral)),
+                torch.zeros(len(proj_formal)),
                 torch.ones(len(proj_creative))
             ]).numpy()
                 
@@ -57,10 +57,10 @@ def get_best_auc_per_token(split_name, neutral_folder, creative_folder, mdvs, th
     
     return token_results
 
-def get_best_auc_per_layer(split_name, neutral_folder, creative_folder, mdvs, thresholds):
+def get_best_auc_per_layer(split_name, formal_folder, creative_folder, mdvs, thresholds):
     """Get the best AUC for each layer across all token positions"""
     print(f"\nFinding best AUC per layer on {split_name} set...")
-    a_neutral = load_activations(neutral_folder)
+    a_formal = load_activations(formal_folder)
     a_creative = load_activations(creative_folder)
     
     layer_results = {}  # layer -> {'auc': best_auc, 'token': best_token, 'acc': best_acc}
@@ -75,15 +75,15 @@ def get_best_auc_per_layer(split_name, neutral_folder, creative_folder, mdvs, th
             mdv = mdvs[(layer, token)]
             threshold = thresholds[(layer, token)]
             # Get activations
-            test_neutral = torch.stack(a_neutral[layer][token])
+            test_formal = torch.stack(a_formal[layer][token])
             test_creative = torch.stack(a_creative[layer][token])
             # Project onto MDV
-            proj_neutral = project_onto(test_neutral, mdv)
+            proj_formal = project_onto(test_formal, mdv)
             proj_creative = project_onto(test_creative, mdv)
             # Combine and label
-            X = torch.cat([proj_neutral, proj_creative]).numpy()
+            X = torch.cat([proj_formal, proj_creative]).numpy()
             y = torch.cat([
-                torch.zeros(len(proj_neutral)),
+                torch.zeros(len(proj_formal)),
                 torch.ones(len(proj_creative))
             ]).numpy()
             y_pred = (X > threshold.item()).astype(int)
@@ -211,16 +211,16 @@ def plot_auc_results(token_results, layer_results, save_dir="plots"):
 
 def main():
 
-    val_neutral_folder = "activations/val/formal"
+    val_formal_folder = "activations/val/formal"
     val_creative_folder = "activations/val/creative"
     mdvs = torch.load("representations/mdvs.pt")
     thresholds = torch.load("representations/thresholds.pt")
         
 
     # Get best AUC for each token position
-    token_results = get_best_auc_per_token("validation", val_neutral_folder, val_creative_folder, mdvs, thresholds)
+    token_results = get_best_auc_per_token("validation", val_formal_folder, val_creative_folder, mdvs, thresholds)
     # Get best AUC for each token position
-    layer_results = get_best_auc_per_layer("validation", val_neutral_folder, val_creative_folder, mdvs, thresholds)
+    layer_results = get_best_auc_per_layer("validation", val_formal_folder, val_creative_folder, mdvs, thresholds)
 
     # For plotting
     tokens = list(token_results.keys())
