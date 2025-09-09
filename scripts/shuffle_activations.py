@@ -258,6 +258,8 @@ def plot_auc_results(token_results, layer_results, shuffled_token_results=None, 
     # Plot 2: AUC across layers  
     layers = sorted(layer_results.keys())
     layer_aucs = [layer_results[l]['auc'] for l in layers]
+
+
     
     # Main results
     ax2.plot(layers, layer_aucs, 'o-', linewidth=2, markersize=6, color='#2E86C1', label='Real Labels')
@@ -266,6 +268,7 @@ def plot_auc_results(token_results, layer_results, shuffled_token_results=None, 
     if shuffled_layer_results is not None:
         shuffled_layers = sorted(shuffled_layer_results.keys())
         shuffled_layer_aucs = [shuffled_layer_results[l]['auc'] for l in shuffled_layers]
+        shuffled_layer_accs = [shuffled_layer_results[l]['acc'] for l in shuffled_layers]
         ax2.plot(shuffled_layers, shuffled_layer_aucs, 's--', linewidth=2, markersize=4, 
                 color='gray', alpha=0.7, label='Shuffled Labels')
     
@@ -295,6 +298,92 @@ def plot_auc_results(token_results, layer_results, shuffled_token_results=None, 
     plt.savefig(f"{save_dir}/auc_analysis_with_baseline.png", dpi=300, bbox_inches='tight')
     plt.savefig(f"{save_dir}/auc_analysis_with_baseline.pdf", bbox_inches='tight')
     plt.show()
+
+
+    # Plot 3: accuracy across token positions
+
+    plt.clf()
+
+    plt.style.use('default')
+    fig, (ax3, ax4) = plt.subplots(1, 2, figsize=(14, 6))
+    
+    token_accs = [token_results[t]['acc'] for t in tokens]
+
+    # Main results
+    ax3.plot(tokens, token_accs, 'o-', linewidth=2, markersize=6, color='#2E86C1', label='Real Labels')
+    
+    # Add shuffled baseline if provided
+    if shuffled_token_results is not None:
+        shuffled_tokens = sorted(shuffled_token_results.keys())
+        shuffled_token_accs = [shuffled_token_results[t]['acc'] for t in shuffled_tokens]
+        ax3.plot(shuffled_tokens, shuffled_token_accs, 's--', linewidth=2, markersize=4, 
+                color='gray', alpha=0.7, label='Shuffled Labels')
+    
+    ax3.set_xlabel('Post-Instruction Token Position', fontsize=12)
+    ax3.set_ylabel('Best accuracy across layers', fontsize=12)
+    ax3.set_title('Accuracy vs Token Position\n(Max over all layers for each token)', fontsize=14)
+    ax3.grid(True, alpha=0.3)
+    
+    # Adjust y-limits based on data
+    if shuffled_token_results is not None:
+        y_min = min(min(token_accs), min(shuffled_token_accs)) - 0.05
+        y_max = max(max(token_accs), max(shuffled_token_accs)) + 0.05
+        ax3.set_ylim(max(0.4, y_min), min(1.0, y_max))
+    else:
+        ax3.set_ylim(0.7, 1.0)  # Original range for real data only
+    
+    # Add horizontal reference lines
+    ax3.axhline(y=0.9, color='red', linestyle='--', alpha=0.5, linewidth=1)
+    ax3.axhline(y=0.5, color='black', linestyle=':', alpha=0.5, linewidth=1)
+    
+    # Add reference line labels
+    ax3.text(max(tokens) - 9.5, 0.91, 'Accuracy = 0.9', fontsize=10, ha='right', va='bottom', color='red')
+    
+    ax3.legend(loc='center right', bbox_to_anchor=(0.02, 0.02))
+
+    # Plot 4: accuracy across layers
+    layer_accs = [layer_results[l]['acc'] for l in layers]
+
+    # Main results
+    ax4.plot(layers, layer_accs, 'o-', linewidth=2, markersize=6, color='#2E86C1', label='Real Labels')
+    
+    # Add shuffled baseline if provided
+    if shuffled_layer_results is not None:
+        shuffled_layers = sorted(shuffled_layer_results.keys())
+        shuffled_layer_accs = [shuffled_layer_results[l]['acc'] for l in shuffled_layers]
+        shuffled_layer_accs = [shuffled_layer_results[l]['acc'] for l in shuffled_layers]
+        ax4.plot(shuffled_layers, shuffled_layer_accs, 's--', linewidth=2, markersize=4, 
+                color='gray', alpha=0.7, label='Shuffled Labels')
+    
+    ax4.set_xlabel('Layer', fontsize=12)
+    ax4.set_ylabel('Best accuracy across tokens', fontsize=12)
+    ax4.set_title('Accuracy vs Layer\n(Max over all tokens for each layer)', fontsize=14)
+    ax4.grid(True, alpha=0.3)
+    
+    # Adjust y-limits based on data
+    if shuffled_layer_results is not None:
+        y_min = min(min(layer_accs), min(shuffled_layer_accs)) - 0.05
+        y_max = max(max(layer_accs), max(shuffled_layer_accs)) + 0.05
+        ax4.set_ylim(max(0.4, y_min), min(1.0, y_max))
+    else:
+        ax4.set_ylim(0.7, 1.0)  # Original range for real data only
+    
+    # Add horizontal reference lines
+    ax4.axhline(y=0.9, color='red', linestyle='--', alpha=0.5, linewidth=1)
+    ax4.axhline(y=0.5, color='black', linestyle=':', alpha=0.5, linewidth=1)
+    
+    # Add reference line labels
+    ax4.text(max(layers) - 3, 0.91, 'Accuracy = 0.9', fontsize=10, ha='right', va='bottom', color='red')
+    
+    ax4.legend(loc="center right")
+    
+    plt.tight_layout()
+    plt.savefig(f"{save_dir}/acc_analysis_with_baseline.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{save_dir}/acc_analysis_with_baseline.pdf", bbox_inches='tight')
+    plt.show()
+
+
+
     
     # Print summary stats
     print(f"\n{'='*60}")
