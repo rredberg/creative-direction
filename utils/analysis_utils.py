@@ -48,7 +48,7 @@ def load_activations(folder, max_token=MAX_TOKEN):
 
 def save_mdvs():
 
-    train_neutral_activations_folder = "activations/train/neutral"
+    train_neutral_activations_folder = "activations/train/formal"
     train_creative_activations_folder = "activations/train/creative"
 
     mdvs_output_file = "representations/mdvs.pt"

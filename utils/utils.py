@@ -72,12 +72,12 @@ def split_prompts(
     print(f"Test prompts: {len(test_prompts)}")
 
 
-def generate_formatted_prompts(creative_system, prompts_file):
+def generate_formatted_prompts(creative_system, formal_system, prompts_file):
     with open(prompts_file, "r") as f:
         prompts = [p.strip() for p in f.readlines() if p.strip()]
-    neutral_prompts = [f"User: {p}\nAssistant:" for p in prompts]
     creative_prompts = [f"{creative_system}\nUser: {p}\nAssistant:" for p in prompts]
-    return neutral_prompts, creative_prompts
+    formal_prompts = [f"{formal_system}\nUser: {p}\nAssistant:" for p in prompts]
+    return creative_prompts, formal_prompts
 
 # -------------------------------
 # Text Generation / Clean-up

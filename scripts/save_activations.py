@@ -30,11 +30,11 @@ def main():
     # Load prompts from  completions folder
     data_paths = {
         "train/creative": "completions/train/creative.txt",
-        "train/neutral": "completions/train/neutral.txt",
+        "train/formal": "completions/train/formal.txt",
         "test/creative": "completions/test/creative.txt",
-        "test/neutral": "completions/test/neutral.txt",
+        "test/formal": "completions/test/formal.txt",
         "val/creative": "completions/val/creative.txt",
-        "val/neutral": "completions/val/neutral.txt",
+        "val/formal": "completions/val/formal.txt",
     }
     
     for key, path in data_paths.items():

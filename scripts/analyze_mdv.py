@@ -1,4 +1,5 @@
 import torch
+import os
 from utils.analysis_utils import load_activations, MAX_TOKEN, N_LAYERS, save_mdvs, project_onto
 from sklearn.metrics import accuracy_score, roc_auc_score
 import matplotlib.pyplot as plt
@@ -80,7 +81,6 @@ def evaluate_test_given_coords(test_neutral_folder, test_creative_folder, mdvs, 
         torch.ones(len(proj_creative))
     ]).numpy()
 
-    # threshold = (proj_creative.mean() + proj_neutral.mean()) / 2
     y_pred = (X > threshold.item()).astype(int)
 
     acc = accuracy_score(y, y_pred)
@@ -94,14 +94,14 @@ def evaluate_test_given_coords(test_neutral_folder, test_creative_folder, mdvs, 
 
 def main():
     # Paths for each split
-    train_neutral_folder = "activations/train/neutral"
+    train_neutral_folder = "activations/train/formal"
     train_creative_folder = "activations/train/creative"
-    val_neutral_folder = "activations/val/neutral"
+    val_neutral_folder = "activations/val/formal"
     val_creative_folder = "activations/val/creative"
-    test_neutral_folder = "activations/test/neutral"
+    test_neutral_folder = "activations/test/formal"
     test_creative_folder = "activations/test/creative"
 
-    # Compute or load MDVs from training data
+    # Compute or load MDVs and thresholds from training data
     mdvs, thresholds = save_mdvs()  # assumes it uses train activations internally
 
     # 1) Evaluate on validation set to find best coords
@@ -117,7 +117,7 @@ def main():
     a_creative = load_activations(test_creative_folder)
 
     mdv = mdvs[(layer, token)]
-    threshold = thesholds[(layer, token)]
+    threshold = thresholds[(layer, token)]
 
     a_val_neutral = load_activations(val_neutral_folder)
     a_val_creative = load_activations(val_creative_folder)
@@ -135,7 +135,6 @@ def main():
     X = torch.cat([proj_neutral, proj_creative]).numpy()
     y = torch.cat([torch.zeros(len(proj_neutral)), torch.ones(len(proj_creative))]).numpy()
 
-    # threshold = (proj_creative.mean() + proj_neutral.mean()) / 2
     y_pred = (X > threshold.item()).astype(int)
 
     acc = accuracy_score(y, y_pred)
@@ -149,20 +148,25 @@ def main():
     # Convert to numpy if they're torch tensors
     proj_neutral_np = proj_neutral.cpu().numpy() if hasattr(proj_neutral, 'cpu') else proj_neutral
     proj_creative_np = proj_creative.cpu().numpy() if hasattr(proj_creative, 'cpu') else proj_creative
+
+    os.makedirs("plots", exist_ok=True)
     
     # Create histograms with some transparency so overlapping regions are visible
 
-    plt.hist(proj_neutral_np, bins=70, alpha=0.7, color='blue', label='Neutral', density=True)
-    plt.hist(proj_creative_np, bins=150, alpha=0.7, color='red', label='Creative', density=True)
+    plt.hist(proj_neutral_np, bins=20, alpha=0.7, color='blue', label='Formal', density=True)
+    plt.hist(proj_creative_np, bins=20, alpha=0.7, color='red', label='Creative', density=True)
     
     plt.xlabel('Projection onto Mean Difference Vector')
     plt.ylabel('Density')
-    plt.title('Distribution of Projections: Neutral vs Creative')
+    plt.title('Distribution of Projections: Formal vs Creative')
     plt.legend()
     plt.grid(True, alpha=0.3)
+
+    threshold = (proj_creative.mean() + proj_neutral.mean()) / 2
+
     
     # Add vertical lines at means for reference
-    plt.axvline(np.mean(proj_neutral_np), color='blue', linestyle='--', alpha=0.8, label='Neutral Mean')
+    plt.axvline(np.mean(proj_neutral_np), color='blue', linestyle='--', alpha=0.8, label='Formal Mean')
     plt.axvline(np.mean(proj_creative_np), color='red', linestyle='--', alpha=0.8, label='Creative Mean')
     plt.axvline(threshold, color='purple', linestyle='--', alpha=0.8, label='Threshold')
     plt.legend()
@@ -170,8 +174,8 @@ def main():
     
     plt.tight_layout()
     plt.show()
-    plt.savefig(f"plots/mdv_projection.png", dpi=300, bbox_inches='tight')
-    plt.savefig(f"plots/mdv_projection.pdf", bbox_inches='tight')
+    plt.savefig(f"plots/mdv_projection_formal_v_creative.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"plots/mdv_projection_formal_v_creative.pdf", bbox_inches='tight')
 
 
 if __name__ == "__main__":
