@@ -36,7 +36,6 @@ def evaluate_on_split(split_name, formal_folder, creative_folder, mdvs, threshol
             ]).numpy()
 
             # Threshold = midpoint between means
-            # threshold = (proj_creative.mean() + proj_formal.mean()) / 2
             y_pred = (X > threshold.item()).astype(int)
 
             acc = accuracy_score(y, y_pred)
