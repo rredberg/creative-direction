@@ -48,7 +48,7 @@ def load_activations(folder, max_token=MAX_TOKEN):
 
 def save_mdvs():
 
-    train_neutral_activations_folder = "activations/train/formal"
+    train_formal_activations_folder = "activations/train/formal"
     train_creative_activations_folder = "activations/train/creative"
 
     mdvs_output_file = "representations/mdvs.pt"
@@ -56,11 +56,11 @@ def save_mdvs():
     
     os.makedirs("representations", exist_ok=True)
     
-    # Load activations from training dataset (both encouraging and neutral)
-    a_train_neutral = load_activations(train_neutral_activations_folder)
+    # Load activations from training dataset (both encouraging and formal)
+    a_train_formal = load_activations(train_formal_activations_folder)
     a_train_creative = load_activations(train_creative_activations_folder)
 
-    # hidden_size = a_train_neutral[0][-1][0].shape[0]
+    # hidden_size = a_train_formal[0][-1][0].shape[0]
     hidden_size = 32
 
     mdvs = {}  # Will store MDVs as mdvs[(layer, token)] = tensor of shape (4096,)
@@ -68,17 +68,17 @@ def save_mdvs():
     
     for layer in range(N_LAYERS):
         for token in range(1, MAX_TOKEN + 1):
-            neutral_vecs = torch.stack(a_train_neutral[layer][token])  # shape: (n_samples, 4096)
+            formal_vecs = torch.stack(a_train_formal[layer][token])  # shape: (n_samples, 4096)
             creative_vecs = torch.stack(a_train_creative[layer][token])          # shape: (n_samples, 4096)
             
             # Compute mean difference vector
-            mdv = creative_vecs.mean(dim=0) - neutral_vecs.mean(dim=0)  # shape: (4096,)
+            mdv = creative_vecs.mean(dim=0) - formal_vecs.mean(dim=0)  # shape: (4096,)
             mdvs[(layer, token)] = mdv
 
             # Compute classification threshold
-            proj_neutral = project_onto(neutral_vecs, mdv)  # (n_neutral,)
+            proj_formal = project_onto(formal_vecs, mdv)  # (n_formal,)
             proj_creative = project_onto(creative_vecs, mdv)          # (n_enc,)
-            threshold = (proj_creative.mean() + proj_neutral.mean()) / 2
+            threshold = (proj_creative.mean() + proj_formal.mean()) / 2
             thresholds[(layer, token)] = threshold
 
             
@@ -94,60 +94,3 @@ def project_onto(vector, direction):
     """Project vector(s) onto direction (not necessarily normalized)."""
     direction = direction / direction.norm()
     return (vector @ direction)
-
-# -------------------------------
-# PCA
-# -------------------------------
-
-def save_pca_lastlayer_lasttoken():
-    # Input folders
-    train_neutral_activations_folder = "activations/train/neutral"
-    train_enc_activations_folder     = "activations/train/creative"
-    val_neutral_activations_folder   = "activations/val/neutral"
-    val_enc_activations_folder       = "activations/val/creative"
-    test_neutral_activations_folder  = "activations/test/neutral"
-    test_enc_activations_folder      = "activations/test/creative"
-
-    # Output file
-    pca_output_file = "representations/pca_lastlayer_lasttoken.pt"
-    os.makedirs("representations", exist_ok=True)
-    
-    # Load activations (dicts: layer → token → list[tensors])
-    a_train_neutral = load_activations(train_neutral_activations_folder)
-    a_train_enc     = load_activations(train_enc_activations_folder)
-    a_val_neutral   = load_activations(val_neutral_activations_folder)
-    a_val_enc       = load_activations(val_enc_activations_folder)
-    a_test_neutral  = load_activations(test_neutral_activations_folder)
-    a_test_enc      = load_activations(test_enc_activations_folder)
-
-    # Last layer + last token only
-    last_layer = N_LAYERS - 1
-    last_token = -1
-
-    # Stack train vectors
-    train_neutral_vecs = torch.stack(a_train_neutral[last_layer][last_token])
-    train_enc_vecs     = torch.stack(a_train_enc[last_layer][last_token])
-    X_train = torch.cat([train_neutral_vecs, train_enc_vecs], dim=0).cpu().numpy()
-    y_train = torch.tensor([0]*len(train_neutral_vecs) + [1]*len(train_enc_vecs))
-
-    # Stack val vectors
-    val_neutral_vecs = torch.stack(a_val_neutral[last_layer][last_token])
-    val_enc_vecs     = torch.stack(a_val_enc[last_layer][last_token])
-    X_val = torch.cat([val_neutral_vecs, val_enc_vecs], dim=0).cpu().numpy()
-    y_val = torch.tensor([0]*len(val_neutral_vecs) + [1]*len(val_enc_vecs))
-
-    # Stack test vectors
-    test_neutral_vecs = torch.stack(a_test_neutral[last_layer][last_token])
-    test_enc_vecs     = torch.stack(a_test_enc[last_layer][last_token])
-    X_test = torch.cat([test_neutral_vecs, test_enc_vecs], dim=0).cpu().numpy()
-    y_test = torch.tensor([0]*len(test_neutral_vecs) + [1]*len(test_enc_vecs))
-
-    # Fit PCA on train only
-    pca = PCA(n_components=50)  # adjust as needed
-    pca.fit(X_train)
-
-    # Project all sets
-    X_train_proj = pca.transform(X_train)
-    X_val_proj   = pca.transform(X_val)
-    X_test_proj  = pca.transform(X_test)
-
